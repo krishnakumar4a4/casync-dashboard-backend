@@ -1,13 +1,19 @@
+#![feature(proc_macro_hygiene, decl_macro)]
 use std::fs::File;
 use std::path::Path;
 use std::io::Read;
 use std::io::Write;
 
 extern crate serde;
-#[macro_use]
+//#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+
+#[macro_use]
+extern crate diesel;
+extern crate dotenv;
+
 
 #[derive(Serialize, Deserialize)]
 pub struct Chunk {
@@ -26,6 +32,13 @@ pub struct Index {
 #[derive(Serialize, Deserialize)]
 pub struct Indexes {
     indexes: Vec<Index>
+}
+
+// This is for rocket
+#[derive(Serialize, Deserialize)]
+pub struct Chunks {
+    index: String,
+    chunks: Vec<Chunk>
 }
 
 impl Index {
@@ -71,9 +84,53 @@ impl Indexes {
     }
 }
 
-fn main() {
-    println!("Hello, world!");
+#[macro_use] extern crate rocket;
+extern crate rocket_contrib;
+use rocket_contrib::json::{Json};
+mod db;
 
+fn main() {
+    //println!("Hello, world!");
+    //db::show_chunks();
+    rocket::ignite().mount("/", routes![root,chunks,indexes]).launch();
+}
+
+#[get("/")]
+fn root() -> &'static str {
+    "Hello, world!"
+}
+
+#[get("/chunks")]
+fn chunks() -> Json<Vec<Chunk>> {
+    let chunks = db::chunks_from_index_id(String::from("1"));
+    let chunk_array: Vec<Chunk> = chunks.iter().map(|chunk| {
+        Chunk{
+            name: chunk.name.to_owned(),
+            size: (chunk.size).to_string().to_owned()
+        }
+    }).collect();
+    Json(chunk_array)
+}
+
+#[get("/indexes")]
+fn indexes() -> Json<Indexes> {
+    let chunks = db::chunks_from_index_id(String::from("1"));
+    let chunk_array: Vec<Chunk> = chunks.iter().map(|chunk| {
+        Chunk{
+            name: chunk.name.to_owned(),
+            size: (chunk.size).to_string().to_owned()
+        }
+    }).collect();
+    let index = Index {
+        id: 1,
+        version: String::from("./"),
+        path: String::from("./"),
+        chunks: chunk_array
+    };
+    let indexes = Indexes {
+        indexes: vec![index]
+    };
+    Json(indexes)
 }
 
 fn add_index(file: File, version: String, path: String) {
