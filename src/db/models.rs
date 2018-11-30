@@ -1,9 +1,13 @@
+//use chrono::DateTime;
+use chrono::prelude::{DateTime, Utc};
 
-// #[derive(Queryable)]
-// pub struct Tag {
-//     pub id: i32,
-//     pub name: String
-// }
+#[derive(Queryable)]
+pub struct Tag {
+    pub id: i32,
+    pub name: String,
+    pub creation_time: DateTime<Utc>,
+    pub accessed_time: DateTime<Utc>
+}
 
 #[derive(Queryable)]
 pub struct Chunk {

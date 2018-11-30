@@ -1,2 +1,3 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE chunks
+DROP TABLE chunk;
+DROP TABLE tag;

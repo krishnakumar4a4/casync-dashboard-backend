@@ -12,6 +12,15 @@ table! {
 }
 
 table! {
+    chunks (id) {
+        id -> Int4,
+        index -> Text,
+        name -> Text,
+        size -> Int4,
+    }
+}
+
+table! {
     tag (id) {
         id -> Int4,
         name -> Text,
@@ -22,5 +31,6 @@ table! {
 
 allow_tables_to_appear_in_same_query!(
     chunk,
+    chunks,
     tag,
 );
