@@ -5,6 +5,7 @@ pub mod models;
 
 use postgres::{Connection, TlsMode};
 use chrono::{DateTime, Utc};
+use ds;
 
 pub fn establish_connection() -> Connection {
     dotenv().ok();
@@ -74,13 +75,17 @@ pub fn load_seed_data() {
         tags: Some(vec![1]),
         stats_download_count: 23
     };
-    conn.execute("insert into chunk values($1,$2,$3,$4,$5,$6,$7,$8);",
-                 &[&chunk1.id,&chunk1.index_id,&chunk1.name,&chunk1.size,
+    conn.execute("insert into chunk(index_id, name, size,
+                   creation_time, accessed_time, tags, stats_download_count)
+                   values($1,$2,$3,$4,$5,$6,$7);",
+                 &[&chunk1.index_id,&chunk1.name,&chunk1.size,
                    &chunk1.creation_time, &chunk1.accessed_time, &chunk1.tags,
                    &chunk1.stats_download_count]).expect("Could not insert seed data");
 
-    conn.execute("insert into chunk values($1,$2,$3,$4,$5,$6,$7,$8);",
-                 &[&chunk2.id,&chunk2.index_id,&chunk2.name,&chunk2.size,
+    conn.execute("insert into chunk(index_id, name, size,
+                   creation_time, accessed_time, tags, stats_download_count)
+                   values($1,$2,$3,$4,$5,$6,$7);",
+                 &[&chunk2.index_id,&chunk2.name,&chunk2.size,
                    &chunk2.creation_time, &chunk2.accessed_time, &chunk2.tags,
                    &chunk2.stats_download_count]).expect("Could not insert seed data");
 
@@ -106,8 +111,10 @@ pub fn load_seed_data() {
         stats_confirmed_download_count: 12,
         stats_anonymous_download_count: 13
     };
-    conn.execute("INSERT INTO index VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-                 &[&index1.id, &index1.name, &index1.path, &index1.chunks, &index1.creation_time,
+    conn.execute("INSERT INTO index(name, path, chunks, creation_time, accessed_time,
+                  stats_confirmed_download_count, stats_anonymous_download_count)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                 &[&index1.name, &index1.path, &index1.chunks, &index1.creation_time,
                    &index1.accessed_time, &index1.stats_confirmed_download_count,
                    &index1.stats_anonymous_download_count])
         .expect("Could not insert seed data");
@@ -122,8 +129,10 @@ pub fn load_seed_data() {
         stats_confirmed_download_count: 1,
         stats_anonymous_download_count: 131
     };
-    conn.execute("INSERT INTO index VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-                 &[&index2.id, &index2.name, &index2.path, &index2.chunks, &index2.creation_time,
+    conn.execute("INSERT INTO index(name, path, chunks, creation_time, accessed_time,
+                  stats_confirmed_download_count, stats_anonymous_download_count)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                 &[&index2.name, &index2.path, &index2.chunks, &index2.creation_time,
                    &index2.accessed_time, &index2.stats_confirmed_download_count,
                    &index2.stats_anonymous_download_count])
         .expect("Could not insert seed data");
@@ -234,4 +243,44 @@ pub fn indexes_for_ids(ids: Vec<i32>) -> Vec<models::Index> {
         }
     };
     indexes
+}
+
+use ds::{IndexFile, IndexChunkItem};
+
+pub fn insert_index(index: IndexFile) {
+    let conn = establish_connection();
+
+    let chunks = index.chunks;
+    let mut chunk_ids_inserted = Vec::new();
+    let initial_download_count = 0;
+    let default_chunk_path = "NA".to_owned();
+    for index_chunk_item in chunks.iter() {
+        // Should remove index_id from chunk table as it creates cyclic dependency
+        let index_id = 1;
+        let dummy_chunk_size = 23;
+        let initial_tags: Vec<i32> = Vec::new();
+        match conn.query("INSERT INTO chunk(index_id, name, size,
+                      creation_time, accessed_time, tags, stats_download_count)
+                      VALUES( $1, $2, $3, $4, $5, $6, $7) RETURNING id",
+                         &[&index_id,&index_chunk_item.name, &dummy_chunk_size,
+                           &Utc::now(), &Utc::now(), &initial_tags,
+                           &initial_download_count]) {
+            Ok(rows) => {
+                let id: i32 = rows.iter().next().unwrap().get(0);
+                chunk_ids_inserted.push(id);
+            },
+            Err(e) => {
+                println!("Could not insert chunks into chunk tables");
+            }
+        }
+    }
+    conn.execute("INSERT INTO index(name, path, chunks, creation_time, accessed_time,
+                  stats_confirmed_download_count, stats_anonymous_download_count)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7) ", &[&index.name,
+                                                       &default_chunk_path,
+                                                       &chunk_ids_inserted,
+                                                       &Utc::now(), &Utc::now(),
+                                                       &initial_download_count,
+                                                       &initial_download_count])
+                 .expect("Could not insert into index table");
 }
