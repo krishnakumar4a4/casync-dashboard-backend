@@ -16,10 +16,14 @@ extern crate rocket_contrib;
 use rocket_contrib::json::{Json};
 mod db;
 mod ds;
+extern crate rocket_cors;
+use rocket_cors::*;
 
 fn main() {
+    let default = rocket_cors::Cors::default();
     rocket::ignite()
         .mount("/", routes![root,chunks,tags,indexes,upload_index])
+	      .attach(default) // Disable cors
         .launch();
 }
 
