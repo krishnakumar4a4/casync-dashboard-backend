@@ -6,12 +6,12 @@ use db;
 
 #[derive(Serialize, Deserialize)]
 pub struct TagItem {
-    id: i32,
-    name: String,
+    pub id: i32,
+    pub name: String,
     #[serde(with = "my_date_format")]
-    creation_time: chrono::DateTime<Utc>,
+    pub creation_time: chrono::DateTime<Utc>,
     #[serde(with = "my_date_format")]
-    accessed_time: chrono::DateTime<Utc>
+    pub accessed_time: chrono::DateTime<Utc>
 }
 
 #[derive(Serialize, Deserialize)]

@@ -23,3 +23,20 @@ pub struct TagsByChunkQueryParams {
 pub struct TagsByIndexQueryParams {
     pub index_id: i32
 }
+
+#[derive(FromForm)]
+pub struct TagNewQueryParams {
+    pub name: String
+}
+
+#[derive(FromForm)]
+pub struct TagUpdateQueryParams {
+    pub id: i32,
+    pub name: String
+}
+
+#[derive(FromForm)]
+pub struct TagIndexQueryParams {
+    pub id: i32,
+    pub index_id: i32
+}

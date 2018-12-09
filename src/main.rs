@@ -27,6 +27,7 @@ fn main() {
         .mount("/", routes![root,
                             chunk_by_id,chunks_all,chunks_for_index_id,chunks_for_tag_id,
                             tag_by_id,tags_all,tags_for_chunk_id,tags_for_index_id,
+                            tag_new,tag_update,tag_index,tag_index_remove,
                             indexes_by_id,indexes_all,
                             upload_index])
 	      .attach(default) // Disable cors
@@ -41,7 +42,7 @@ fn root() -> &'static str {
     "Hello, world!"
 }
 
-#[get("/chunks/<id>")]
+#[get("/chunks/<id>",rank=4)]
 fn chunk_by_id(id: i32) -> Json<Vec<ds::ChunkItem>> {
     // TODO: Replace default_vendor_product_id with the one from auth
     let default_vendor_product_id = 1;
@@ -68,7 +69,7 @@ fn chunk_by_id(id: i32) -> Json<Vec<ds::ChunkItem>> {
     Json(chunk_array)
 }
 
-#[get("/chunks")]
+#[get("/chunks",rank=3)]
 fn chunks_all() -> Json<Vec<ds::ChunkItemRow>> {
     // TODO: Replace default_vendor_product_id with the one from auth
     let default_vendor_product_id = 1;
@@ -84,12 +85,12 @@ fn chunks_all() -> Json<Vec<ds::ChunkItemRow>> {
     Json(chunk_array)
 }
 
-#[get("/chunks?<chunksByIndexQueryParams..>",rank=1)]
-fn chunks_for_index_id(chunksByIndexQueryParams: Form<params::ChunksByIndexQueryParams>) -> Json<Vec<ds::ChunkItem>> {
-    let id = chunksByIndexQueryParams.index_id;
+#[get("/chunks?<chunks_by_tag_query_params..>",rank=2)]
+fn chunks_for_tag_id(chunks_by_tag_query_params: Form<params::ChunksByTagQueryParams>) -> Json<Vec<ds::ChunkItem>> {
+    let id = chunks_by_tag_query_params.tag_id;
     // TODO: Replace default_vendor_product_id with the one from auth
     let default_vendor_product_id = 1;
-    let chunks = db::chunks_for_index_id(id, default_vendor_product_id);
+    let chunks = db::chunks_for_tag_id(id, default_vendor_product_id);
     println!("chunks len {}",chunks.len());
     let mut tag_ids: Vec<i32> = Vec::new();
     for chunk in chunks.iter() {
@@ -112,12 +113,12 @@ fn chunks_for_index_id(chunksByIndexQueryParams: Form<params::ChunksByIndexQuery
     Json(chunk_array)
 }
 
-#[get("/chunks?<chunks_by_tag_query_params..>")]
-fn chunks_for_tag_id(chunks_by_tag_query_params: Form<params::ChunksByTagQueryParams>) -> Json<Vec<ds::ChunkItem>> {
-    let id = chunks_by_tag_query_params.tag_id;
+#[get("/chunks?<chunksByIndexQueryParams..>",rank=1)]
+fn chunks_for_index_id(chunksByIndexQueryParams: Form<params::ChunksByIndexQueryParams>) -> Json<Vec<ds::ChunkItem>> {
+    let id = chunksByIndexQueryParams.index_id;
     // TODO: Replace default_vendor_product_id with the one from auth
     let default_vendor_product_id = 1;
-    let chunks = db::chunks_for_tag_id(id, default_vendor_product_id);
+    let chunks = db::chunks_for_index_id(id, default_vendor_product_id);
     println!("chunks len {}",chunks.len());
     let mut tag_ids: Vec<i32> = Vec::new();
     for chunk in chunks.iter() {
@@ -209,6 +210,34 @@ fn tags_for_index_id(tags_by_index_query_params: Form<params::TagsByIndexQueryPa
         ds::TagItem::new(tag.id, tag.name.to_owned(), tag.creation_time, tag.accessed_time)
     }).collect();
     Json(tag_array)
+}
+
+#[put("/tags/new?<tag_new_query_params..>")]
+fn tag_new(tag_new_query_params: Form<params::TagNewQueryParams>) -> Json<ds::TagItem> {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    Json(db::tag_new(tag_new_query_params.name.to_owned(), default_vendor_product_id))
+}
+
+#[put("/tags/update?<tag_update_query_params..>")]
+fn tag_update(tag_update_query_params: Form<params::TagUpdateQueryParams>) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    db::tag_update(tag_update_query_params.id, tag_update_query_params.name.to_owned(), default_vendor_product_id)
+}
+
+#[put("/tags/add?<tag_index_query_params..>", rank=1)]
+fn tag_index(tag_index_query_params: Form<params::TagIndexQueryParams>) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    db::tag_index(tag_index_query_params.id, tag_index_query_params.index_id, default_vendor_product_id)
+}
+
+#[put("/tags/remove?<tag_index_query_params..>", rank=2)]
+fn tag_index_remove(tag_index_query_params: Form<params::TagIndexQueryParams>) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    db::tag_index_remove(tag_index_query_params.id, tag_index_query_params.index_id, default_vendor_product_id)
 }
 
 #[get("/indexes/<id>")]

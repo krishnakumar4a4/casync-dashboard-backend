@@ -61,7 +61,9 @@ pub fn create_tables() {
        accessed_time timestamp with time zone NOT NULL,
        stats_confirmed_download_count INT NOT NULL,
        stats_anonymous_download_count INT NOT NULL,
-       vendor_product_id INT NOT NULL)", &[]).expect("Table index doesn't exist and could not create it");
+       vendor_product_id INT NOT NULL,
+       tag_id INT
+       )", &[]).expect("Table index doesn't exist and could not create it");
 }
 
 pub fn drop_tables() {
@@ -369,6 +371,63 @@ pub fn tags_for_ids(ids: Vec<i32>, vendor_product_id: i32) -> Vec<models::Tag> {
         }
     };
     tags
+}
+
+pub fn tag_new(name: String, vendor_product_id: i32) -> ds::TagItem {
+    let conn = establish_connection();
+    let mut tag = ds::TagItem {
+        id: 0,
+        name: name.to_owned(),
+        creation_time: Utc::now(),
+        accessed_time: Utc::now()
+    };
+    match conn.query("INSERT INTO tag(name, creation_time, accessed_time, vendor_product_id) VALUES($1,$2,$3,$4) RETURNING id",
+     &[&tag.name, &tag.creation_time, &tag.accessed_time, &vendor_product_id]) {
+         Ok(rows) => {
+             let id:i32 = rows.iter().next().unwrap().get(0);
+             tag.id = id;
+             tag
+         },
+         Err(e) => {
+            println!("Could not add new tag with name {}, error {}",name, e);
+            tag
+         }
+     }
+}
+
+pub fn tag_update(id: i32, name: String, vendor_product_id: i32) {
+    let conn = establish_connection();
+    let tag = ds::TagItem {
+        id: id,
+        name: name.to_owned(),
+        creation_time: Utc::now(),
+        accessed_time: Utc::now()
+    };
+    conn.execute("UPDATE tag SET name = $1, accessed_time = $2 WHERE id = $3 RETURNING id",
+     &[&tag.name, &tag.accessed_time, &tag.id])
+     .expect(&format!("Could not update tag with name {} and id {}",name, id));
+}
+
+pub fn tag_index(id: i32, index_id: i32, vendor_product_id: i32) {
+    let conn = establish_connection();
+    conn.execute("UPDATE index SET tag_id = $1 WHERE id = $2",
+     &[&id, &index_id])
+     .expect(&format!("Could not add index with tag_id {} for id {}",id, index_id));
+
+    conn.execute("UPDATE chunk SET tags = array_append(tags,$1) WHERE index_id = $2",
+     &[&id, &index_id])
+     .expect(&format!("Could not add chunk with tag_id {} for id {}",id, index_id));
+}
+
+pub fn tag_index_remove(id: i32, index_id: i32, vendor_product_id: i32) {
+    let conn = establish_connection();
+    conn.execute("UPDATE index SET tag_id = NULL WHERE id = $1",
+     &[&index_id])
+     .expect(&format!("Could not remove tag from index for id {}",index_id));
+
+    conn.execute("UPDATE chunk SET tags = array_remove(tags,$1) WHERE index_id = $2",
+     &[&id, &index_id])
+     .expect(&format!("Could not remove tag_id {} from chunk for index_id {}",id, index_id));
 }
 
 pub fn indexes_for_ids(ids: Vec<i32>, vendor_product_id: i32) -> Vec<models::Index> {
