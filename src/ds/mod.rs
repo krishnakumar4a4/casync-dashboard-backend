@@ -29,10 +29,23 @@ pub struct ChunkItem {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct ChunkItemRow {
+    id: i32,
+    index_id: i32,
+    name: String,
+    size: i32,
+    #[serde(with = "my_date_format")]
+    creation_time: chrono::DateTime<Utc>,
+    #[serde(with = "my_date_format")]
+    accessed_time: chrono::DateTime<Utc>,
+    tags: Vec<i32>,
+    stats_download_count: i32
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct IndexItem {
     pub id: i32,
     pub name: String,
-    pub path: String,
     pub chunks: Vec<ChunkItem>,
     #[serde(with = "my_date_format")]
     pub creation_time: chrono::DateTime<Utc>,
@@ -40,6 +53,33 @@ pub struct IndexItem {
     pub accessed_time: chrono::DateTime<Utc>,
     pub stats_confirmed_download_count: i32,
     pub stats_anonymous_download_count: i32
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct IndexItemRow {
+    pub id: i32,
+    pub name: String,
+    #[serde(with = "my_date_format")]
+    pub creation_time: chrono::DateTime<Utc>,
+    #[serde(with = "my_date_format")]
+    pub accessed_time: chrono::DateTime<Utc>,
+    pub stats_confirmed_download_count: i32,
+    pub stats_anonymous_download_count: i32
+}
+
+impl ChunkItemRow {
+    pub fn new(id: i32, index_id: i32, name: String, size: i32, creation_time: chrono::DateTime<Utc>, accessed_time: chrono::DateTime<Utc>, tags: Vec<i32>, download_count: i32) -> ChunkItemRow {
+        ChunkItemRow {
+            id: id,
+            index_id: index_id,
+            name: name,
+            size: size,
+            creation_time: creation_time,
+            accessed_time: accessed_time,
+            tags: tags,
+            stats_download_count: download_count
+        }
+    }
 }
 
 impl ChunkItem {
@@ -75,7 +115,7 @@ impl TagItem {
 }
 
 impl IndexItem {
-    pub fn new(id: i32, name: String, path: String,
+    pub fn new(id: i32, name: String,
                chunks: Vec<ChunkItem>,
                creation_time: chrono::DateTime<Utc>,
                accessed_time: chrono::DateTime<Utc>,
@@ -84,8 +124,24 @@ impl IndexItem {
         IndexItem {
             id: id,
             name: name,
-            path: path,
             chunks: chunks,
+            creation_time: creation_time,
+            accessed_time: accessed_time,
+            stats_confirmed_download_count: stats_confirmed_download_count,
+            stats_anonymous_download_count: stats_anonymous_download_count
+        }
+    }
+}
+
+impl IndexItemRow {
+    pub fn new(id: i32, name: String,
+               creation_time: chrono::DateTime<Utc>,
+               accessed_time: chrono::DateTime<Utc>,
+               stats_confirmed_download_count: i32,
+               stats_anonymous_download_count: i32) -> IndexItemRow {
+        IndexItemRow {
+            id: id,
+            name: name,
             creation_time: creation_time,
             accessed_time: accessed_time,
             stats_confirmed_download_count: stats_confirmed_download_count,
@@ -117,6 +173,7 @@ impl IndexChunkItem {
 
 impl IndexFile {
     pub fn new(index_file: String, version: String) -> IndexFile {
+        // TODO: Path should be based on folders corresponding to vendor and product
         let path = "./test/".to_owned();
         let mut index_file_path = path.clone();
         index_file_path.push_str(&(index_file.to_owned()));
