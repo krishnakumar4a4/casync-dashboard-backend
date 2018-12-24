@@ -97,7 +97,9 @@ pub fn load_seed_data() {
     let defaultVendorProduct = models::VendorProduct {
         id: 1,
         vendor_id: 1,
+        vendor_name: "default".to_string(),
         product_id: 1,
+        product_name: "default".to_string(),
         creation_time: Utc::now(),
         accessed_time: Utc::now()
     };
@@ -210,6 +212,31 @@ pub fn load_seed_data() {
                    &index2.accessed_time, &index2.stats_confirmed_download_count,
                    &index2.stats_anonymous_download_count, &index2.vendor_product_id])
         .expect("Could not insert seed data into index table");
+}
+
+pub fn vendor_product_for_id(vendor_product_id: i32) -> Option<models::VendorProduct> {
+    let conn = establish_connection();
+    match conn.query("select vp.id, v.id, v.name, p.id, p.name, vp.creation_time, vp.accessed_time
+                        from vendor_product vp 
+                        inner join vendor v on v.id = vp.vendor_id 
+                        inner join product p on p.id = vp.product_id where vp.id=$1", &[&vendor_product_id]) {
+        Ok(rows) => {
+            let row = rows.get(0);
+            Some(models::VendorProduct {
+                id: row.get(0),
+                vendor_id: row.get(1),
+                vendor_name: row.get(2),
+                product_id: row.get(3),
+                product_name: row.get(4),
+                creation_time: row.get(5),
+                accessed_time: row.get(6)
+            })
+        }
+        Err(e) => {
+            println!("Could not get vendor product for id {}, error {}", vendor_product_id, e);
+            None
+        }
+    }
 }
 
 pub fn chunks_all(vendor_product_id: i32) -> Vec<models::Chunk> {

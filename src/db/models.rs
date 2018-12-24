@@ -17,7 +17,9 @@ pub struct Product {
 pub struct VendorProduct {
     pub id: i32,
     pub vendor_id: i32,
+    pub vendor_name: String,
     pub product_id: i32,
+    pub product_name: String,
     pub creation_time: DateTime<Utc>,
     pub accessed_time: DateTime<Utc>
 }

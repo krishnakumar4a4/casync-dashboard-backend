@@ -172,15 +172,14 @@ impl IndexChunkItem {
 }
 
 impl IndexFile {
-    pub fn new(index_file: String, version: String) -> IndexFile {
-        // TODO: Path should be based on folders corresponding to vendor and product
-        let path = "./test/".to_owned();
-        let mut index_file_path = path.clone();
-        index_file_path.push_str(&(index_file.to_owned()));
+    pub fn new(index_file_path: String, index_file: String, version: String) -> IndexFile {
+        let mut full_index_file_path = index_file_path.clone();
+        full_index_file_path.push_str("/");
+        full_index_file_path.push_str(&(index_file.to_owned()));
 
         let mut read_buf = [0; 70];
         let mut chunks = Vec::new();
-        let mut file = File::open(Path::new(&index_file_path)).unwrap();
+        let mut file = File::open(Path::new(&full_index_file_path)).unwrap();
         loop {
             match file.read_exact(&mut read_buf) {
                 Ok(()) => (),
@@ -198,7 +197,7 @@ impl IndexFile {
         IndexFile {
             name: index_file,
             version: version,
-            path: path,
+            path: index_file_path,
             chunks: chunks
         }
     }

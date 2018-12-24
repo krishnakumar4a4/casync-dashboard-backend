@@ -20,6 +20,7 @@ mod params;
 use rocket::request::Form;
 extern crate rocket_cors;
 use rocket_cors::*;
+use std::fs::DirBuilder;
 
 fn main() {
     let default = rocket_cors::Cors::default();
@@ -305,19 +306,36 @@ fn upload_index(index_upload_params: Form<params::IndexUploadParams>, data: Data
     // TODO: Replace default_vendor_product_id with the one from auth
     let default_vendor_product_id = 1;
     let index_file = index_upload_params.name.to_owned();
-    let path = "./test/".to_owned();
-    let mut index_file_path = path.clone();
-    index_file_path.push_str(&(index_file.to_owned()));
-
-    match data.stream_to_file(index_file_path.clone()) {
-        Ok(n) => {
-            println!("Wrote {} bytes to file {}", n, index_file_path);
-            let index_file_struct = ds::IndexFile::new(index_file, index_upload_params.version.to_owned());
-            println!("Number of chunks read {}", index_file_struct.chunks.len());
-            db::insert_index(index_file_struct,default_vendor_product_id);
+    match db::vendor_product_for_id(default_vendor_product_id) {
+        Some(vp) => {
+            let mut index_file_path = "".to_owned();
+            let vendor_name = vp.vendor_name;
+            let product_name = vp.product_name;
+            index_file_path.push_str(&(vendor_name));
+            index_file_path.push_str("/");
+            index_file_path.push_str(&(product_name));
+            let mut full_index_file_path = index_file_path.clone();
+            full_index_file_path.push_str("/");
+            full_index_file_path.push_str(&(index_file.to_owned()));
+            
+            println!("dir to store index {}", index_file_path);
+            DirBuilder::new()
+                .recursive(true)
+                .create(index_file_path.clone());
+            match data.stream_to_file(full_index_file_path.clone()) {
+                Ok(n) => {
+                    println!("Wrote {} bytes to file {}", n, index_file_path);
+                    let index_file_struct = ds::IndexFile::new(index_file_path, index_file, index_upload_params.version.to_owned());
+                    println!("Number of chunks read {}", index_file_struct.chunks.len());
+                    db::insert_index(index_file_struct,default_vendor_product_id);
+                },
+                Err(e) => {
+                    println!("Error writing to file {}",e);
+                }
+            }
         },
-        Err(e) => {
-            println!("Error writing to file {}",e);
+        None => {
+            println!("Could not upload index file")
         }
     }
 }
