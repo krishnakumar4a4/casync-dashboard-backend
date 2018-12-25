@@ -19,7 +19,7 @@ pub struct ChunkItem {
     id: i32,
     index_id: i32,
     name: String,
-    size: i32,
+    size: i64,
     #[serde(with = "my_date_format")]
     creation_time: chrono::DateTime<Utc>,
     #[serde(with = "my_date_format")]
@@ -33,7 +33,7 @@ pub struct ChunkItemRow {
     id: i32,
     index_id: i32,
     name: String,
-    size: i32,
+    size: i64,
     #[serde(with = "my_date_format")]
     creation_time: chrono::DateTime<Utc>,
     #[serde(with = "my_date_format")]
@@ -68,7 +68,7 @@ pub struct IndexItemRow {
 }
 
 impl ChunkItemRow {
-    pub fn new(id: i32, index_id: i32, name: String, size: i32, creation_time: chrono::DateTime<Utc>, accessed_time: chrono::DateTime<Utc>, tags: Vec<i32>, download_count: i32) -> ChunkItemRow {
+    pub fn new(id: i32, index_id: i32, name: String, size: i64, creation_time: chrono::DateTime<Utc>, accessed_time: chrono::DateTime<Utc>, tags: Vec<i32>, download_count: i32) -> ChunkItemRow {
         ChunkItemRow {
             id: id,
             index_id: index_id,
@@ -83,7 +83,7 @@ impl ChunkItemRow {
 }
 
 impl ChunkItem {
-    pub fn new(id: i32, index_id: i32, name: String, size: i32, creation_time: chrono::DateTime<Utc>, accessed_time: chrono::DateTime<Utc>, tags: Vec<&db::models::Tag>, download_count: i32) -> ChunkItem {
+    pub fn new(id: i32, index_id: i32, name: String, size: i64, creation_time: chrono::DateTime<Utc>, accessed_time: chrono::DateTime<Utc>, tags: Vec<&db::models::Tag>, download_count: i32) -> ChunkItem {
         let mut local_tags = Vec::new();
         for tag in tags.iter() {
             local_tags.push(TagItem::new(tag.id, tag.name.to_owned(),
@@ -152,7 +152,7 @@ impl IndexItemRow {
 
 pub struct IndexChunkItem {
     pub name: String,
-    pub size: u64
+    pub size: i64
 }
 
 pub struct IndexFile {
@@ -166,7 +166,7 @@ impl IndexChunkItem {
     pub fn new(name: String, size: u64) -> IndexChunkItem {
         IndexChunkItem {
             name: name,
-            size: size
+            size: (size as i64)
         }
     }
 }

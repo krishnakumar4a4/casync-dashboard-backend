@@ -36,7 +36,7 @@ pub struct Chunk {
     pub id: i32,
     pub index_id: i32,
     pub name: String,
-    pub size: i32,
+    pub size: i64,
     pub creation_time: DateTime<Utc>,
     pub accessed_time: DateTime<Utc>,
     pub tags: Option<Vec<i32>>,

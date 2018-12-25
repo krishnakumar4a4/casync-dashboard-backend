@@ -30,7 +30,7 @@ fn main() {
                             tag_by_id,tags_all,tags_for_chunk_id,tags_for_index_id,
                             tag_new,tag_update,tag_index,tag_index_remove,
                             indexes_by_id,indexes_all,
-                            upload_index])
+                            upload_index, upload_chunks])
 	      .attach(default) // Disable cors
         .launch();
 }
@@ -302,7 +302,7 @@ use rocket::data::Data;
 
 // If not multipart upload, can it be DOS'ed? (as it tries to read all data at once)
 #[post("/upload/index?<index_upload_params..>", format="plain", data="<data>")]
-fn upload_index(index_upload_params: Form<params::IndexUploadParams>, data: Data) {
+fn upload_index(index_upload_params: Form<params::IndexUploadParams>, data: Data) -> Json<Vec<i32>>{
     // TODO: Replace default_vendor_product_id with the one from auth
     let default_vendor_product_id = 1;
     let index_file = index_upload_params.name.to_owned();
@@ -327,7 +327,53 @@ fn upload_index(index_upload_params: Form<params::IndexUploadParams>, data: Data
                     println!("Wrote {} bytes to file {}", n, index_file_path);
                     let index_file_struct = ds::IndexFile::new(index_file_path, index_file, index_upload_params.version.to_owned());
                     println!("Number of chunks read {}", index_file_struct.chunks.len());
-                    db::insert_index(index_file_struct,default_vendor_product_id);
+                    match db::insert_index(index_file_struct,default_vendor_product_id) {
+                        Some(index_id) => Json(vec![index_id]),
+                        None => Json(vec![])
+                    }
+                },
+                Err(e) => {
+                    println!("Error writing to file {}",e);
+                    Json(vec![])
+                }
+            }
+        },
+        None => {
+            println!("Could not upload index file");
+            Json(vec![])
+        }
+    }
+}
+
+#[post("/upload/chunk?<chunk_upload_params..>", format="plain", data="<data>")]
+fn upload_chunks(chunk_upload_params: Form<params::ChunkUploadParams>, data: Data) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    let mut chunk_file = chunk_upload_params.name.clone();
+    match db::vendor_product_for_id(default_vendor_product_id) {
+        Some(vp) => {
+            let mut chunk_file_path = "".to_owned();
+            let vendor_name = vp.vendor_name;
+            let product_name = vp.product_name;
+            chunk_file_path.push_str(&(vendor_name));
+            chunk_file_path.push_str("/");
+            chunk_file_path.push_str(&(product_name));
+            chunk_file_path.push_str("/");
+            chunk_file_path.push_str("store");
+
+            let mut full_chunk_file_path = chunk_file_path.clone();
+            full_chunk_file_path.push_str("/");
+            full_chunk_file_path.push_str(&(chunk_file.to_owned()));
+            
+            println!("chunk {} added", full_chunk_file_path);
+            DirBuilder::new()
+                .recursive(true)
+                .create(chunk_file_path.clone());
+            match data.stream_to_file(full_chunk_file_path.clone()) {
+                Ok(n) => {
+                    println!("Wrote {} bytes to file {}", n, chunk_file_path);
+                    chunk_file.truncate(64);
+                    db::update_chunk_file_exists(chunk_upload_params.index_id, chunk_file, default_vendor_product_id);
                 },
                 Err(e) => {
                     println!("Error writing to file {}",e);
@@ -335,7 +381,7 @@ fn upload_index(index_upload_params: Form<params::IndexUploadParams>, data: Data
             }
         },
         None => {
-            println!("Could not upload index file")
+            println!("Could not upload chunk file")
         }
     }
 }

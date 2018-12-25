@@ -41,12 +41,13 @@ pub fn create_tables() {
        id SERIAL PRIMARY KEY NOT NULL,
        index_id INT NOT NULL,
        name TEXT NOT NULL,
-       size INT NOT NULL,
+       size BIGINT NOT NULL,
        creation_time timestamp with time zone NOT NULL,
        accessed_time timestamp with time zone NOT NULL,
        tags integer ARRAY,
        stats_download_count INT NOT NULL,
-       vendor_product_id INT NOT NULL)", &[]).expect("Table chunk doesn't exist and could not create it");
+       vendor_product_id INT NOT NULL,
+       file_exists boolean default false NOT NULL)", &[]).expect("Table chunk doesn't exist and could not create it");
     conn.execute("CREATE TABLE IF NOT EXISTS tag (
        id SERIAL PRIMARY KEY NOT NULL,
        name TEXT NOT NULL,
@@ -517,7 +518,7 @@ pub fn indexes_all(vendor_product_id: i32) -> Vec<models::Index> {
 
 use ds::{IndexFile, IndexChunkItem};
 
-pub fn insert_index(index: IndexFile, vendor_product_id: i32) {
+pub fn insert_index(index: IndexFile, vendor_product_id: i32) -> Option<i32> {
     let conn = establish_connection();
 
     let chunks = index.chunks;
@@ -525,13 +526,12 @@ pub fn insert_index(index: IndexFile, vendor_product_id: i32) {
     let initial_download_count = 0;
     let mut index_id: i32 = 0;
     for index_chunk_item in chunks.iter() {
-        // TODO: Should get actual chunk size from the index file instead of dummy
-        let dummy_chunk_size = 23;
         let initial_tags: Vec<i32> = Vec::new();
+        // TODO: Should have a field to indicate if the chunk is available
         match conn.query("INSERT INTO chunk(index_id, name, size,
                       creation_time, accessed_time, tags, stats_download_count,vendor_product_id)
                       VALUES( $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-                         &[&index_id,&index_chunk_item.name, &dummy_chunk_size,
+                         &[&index_id,&index_chunk_item.name, &index_chunk_item.size,
                            &Utc::now(), &Utc::now(), &initial_tags,
                            &initial_download_count, &vendor_product_id]) {
             Ok(rows) => {
@@ -556,5 +556,15 @@ pub fn insert_index(index: IndexFile, vendor_product_id: i32) {
         }
     };
     conn.execute("UPDATE chunk SET index_id = $1 WHERE id = ANY($2)", &[&index_id, &chunk_ids_inserted])
+        .expect("Could not update index_id back in chunk table");
+    Some(index_id)
+}
+
+pub fn update_chunk_file_exists(index_id: i32, chunk_name: String, vendor_product_id: i32) {
+    let conn = establish_connection();
+    // TODO: If not a valid index_id, chunk_name, vendor_product_id, simply ignore
+    conn.execute("UPDATE chunk SET file_exists = true 
+                WHERE name = $1 AND vendor_product_id = $2 AND index_id = $3", 
+                &[&chunk_name, &vendor_product_id, &index_id])
         .expect("Could not update index_id back in chunk table");
 }

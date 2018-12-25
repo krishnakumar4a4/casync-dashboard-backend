@@ -5,6 +5,13 @@ pub struct IndexUploadParams {
 }
 
 #[derive(FromForm)]
+pub struct ChunkUploadParams {
+    pub name: String,
+    pub index_id: i32
+    // Can add sha field here
+}
+
+#[derive(FromForm)]
 pub struct ChunksByIndexQueryParams {
     pub index_id: i32
 }
