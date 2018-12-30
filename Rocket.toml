@@ -1,5 +1,5 @@
 [development]
-address = "localhost"
+address = "127.0.0.1"
 port = 8001
 workers = 4
 keep_alive = 5

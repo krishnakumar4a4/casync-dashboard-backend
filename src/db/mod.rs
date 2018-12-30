@@ -124,7 +124,7 @@ pub fn load_seed_data() {
         creation_time: Utc::now(),
         accessed_time: Utc::now(),
         tags: Some(vec![1,2]),
-        stats_download_count: 234,
+        stats_download_count: 0,
         vendor_product_id: 1
     };
     let chunk2 = models::Chunk{
@@ -135,7 +135,7 @@ pub fn load_seed_data() {
         creation_time: Utc::now(),
         accessed_time: Utc::now(),
         tags: Some(vec![1]),
-        stats_download_count: 23,
+        stats_download_count: 0,
         vendor_product_id: 1
     };
     conn.execute("insert into chunk(index_id, name, size,
@@ -184,8 +184,8 @@ pub fn load_seed_data() {
         chunks: Some(vec![1,2]),
         creation_time: Utc::now(),
         accessed_time: Utc::now(),
-        stats_confirmed_download_count: 12,
-        stats_anonymous_download_count: 13,
+        stats_confirmed_download_count: 0,
+        stats_anonymous_download_count: 0,
         vendor_product_id: 1
     };
     conn.execute("INSERT INTO index(name, chunks, creation_time, accessed_time,
@@ -202,8 +202,8 @@ pub fn load_seed_data() {
         chunks: Some(vec![1]),
         creation_time: Utc::now(),
         accessed_time: Utc::now(),
-        stats_confirmed_download_count: 1,
-        stats_anonymous_download_count: 131,
+        stats_confirmed_download_count: 0,
+        stats_anonymous_download_count: 0,
         vendor_product_id: 1
     };
     conn.execute("INSERT INTO index(name, chunks, creation_time, accessed_time,
@@ -567,4 +567,54 @@ pub fn update_chunk_file_exists(index_id: i32, chunk_name: String, vendor_produc
                 WHERE name = $1 AND vendor_product_id = $2 AND index_id = $3", 
                 &[&chunk_name, &vendor_product_id, &index_id])
         .expect("Could not update index_id back in chunk table");
+}
+
+pub fn add_index_download_count(id: Option<i32>, name: Option<String>, c_count: i32, a_count: i32, vendor_product_id: i32) {
+    let conn = establish_connection();
+    match id {
+        Some(id) => {
+            if c_count > 0 || a_count > 0 {
+                conn.execute("UPDATE index SET stats_anonymous_download_count = stats_anonymous_download_count + $1,
+                                 stats_confirmed_download_count = stats_confirmed_download_count + $2 
+                                WHERE id = $3 AND vendor_product_id = $4", 
+                                &[&a_count, &c_count, &id, &vendor_product_id])
+                    .expect("Could not update index stats");
+            }
+        },
+        None => {
+            if let Some(name) = name {
+                if c_count > 0 || a_count > 0 {
+                    conn.execute("UPDATE index SET stats_anonymous_download_count = stats_anonymous_download_count + $1,
+                                     stats_confirmed_download_count = stats_confirmed_download_count + $2 
+                                    WHERE name = $3 AND vendor_product_id = $4", 
+                                    &[&a_count, &c_count, &name, &vendor_product_id])
+                        .expect("Could not update index stats");
+                }
+            }
+        }
+    }
+}
+
+pub fn add_chunk_download_count(id: Option<i32>, name: Option<String>, c_count: i32, vendor_product_id: i32) {
+    let conn = establish_connection();
+    match id {
+        Some(id) => {
+            if c_count > 0 {
+                conn.execute("UPDATE chunk SET stats_download_count = stats_download_count + $1 
+                                WHERE id = $2 AND vendor_product_id = $3", 
+                                &[&c_count, &id, &vendor_product_id])
+                    .expect("Could not update chunk stats");
+            }
+        },
+        None => {
+            if let Some(name) = name {
+                if c_count > 0 {
+                    conn.execute("UPDATE chunk SET stats_download_count = stats_download_count + $1 
+                                WHERE id = $2 AND vendor_product_id = $3", 
+                                    &[&c_count, &name, &vendor_product_id])
+                        .expect("Could not update chunk stats");
+                }
+            }
+        }
+    }
 }

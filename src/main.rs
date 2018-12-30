@@ -30,7 +30,8 @@ fn main() {
                             tag_by_id,tags_all,tags_for_chunk_id,tags_for_index_id,
                             tag_new,tag_update,tag_index,tag_index_remove,
                             indexes_by_id,indexes_all,
-                            upload_index, upload_chunks])
+                            upload_index, upload_chunks,
+                            add_index_download_count, add_chunk_download_count])
 	      .attach(default) // Disable cors
         .launch();
 }
@@ -386,6 +387,22 @@ fn upload_chunks(chunk_upload_params: Form<params::ChunkUploadParams>, data: Dat
     }
 }
 
+#[post("/stats/download?<stats_index_download..>", rank=2)]
+fn add_index_download_count(stats_index_download: Form<params::StatsIndexDownload>) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    db::add_index_download_count(stats_index_download.index_id, stats_index_download.index_name.to_owned(), 
+                                stats_index_download.confirmed_count, 
+                                stats_index_download.anonymous_count, default_vendor_product_id)
+}
+
+#[post("/stats/download?<stats_chunk_download..>", rank=1)]
+fn add_chunk_download_count(stats_chunk_download: Form<params::StatsChunkDownload>) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    db::add_chunk_download_count(stats_chunk_download.chunk_id, stats_chunk_download.chunk_name.to_owned(), 
+                                stats_chunk_download.confirmed_count, default_vendor_product_id)
+}
 // // Get requests
 // #[get("/indexes")]
 // #[get("/chunk/<id>")]
