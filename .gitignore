@@ -1,2 +1,8 @@
 test
 target
+default
+*.caibx
+*.caidx
+*.cacnk
+desync
+casync

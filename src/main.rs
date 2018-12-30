@@ -31,7 +31,8 @@ fn main() {
                             tag_new,tag_update,tag_index,tag_index_remove,
                             indexes_by_id,indexes_all,
                             upload_index, upload_chunks,
-                            add_index_download_count, add_chunk_download_count])
+                            add_index_download_count, add_chunk_download_count,
+                            upload_blob])
 	      .attach(default) // Disable cors
         .launch();
 }
@@ -387,6 +388,89 @@ fn upload_chunks(chunk_upload_params: Form<params::ChunkUploadParams>, data: Dat
     }
 }
 
+use std::process::Command;
+
+#[post("/upload/blob?<blob_upload_params..>", format="plain", data="<data>")]
+fn upload_blob(blob_upload_params: Form<params::BlobUploadParams>, data: Data) {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    let blob_file = blob_upload_params.blob_name.to_owned();
+    let index_file = blob_upload_params.index_name.to_owned();
+    match db::vendor_product_for_id(default_vendor_product_id) {
+        Some(vp) => {
+            let mut blob_file_path = "".to_owned();
+            let vendor_name = vp.vendor_name;
+            let product_name = vp.product_name;
+            blob_file_path.push_str(&(vendor_name));
+            blob_file_path.push_str("/");
+            blob_file_path.push_str(&(product_name));
+            let mut full_blob_file_path = blob_file_path.clone();
+            full_blob_file_path.push_str("/");
+            full_blob_file_path.push_str(&(blob_file.to_owned()));
+
+            let mut full_chunk_store_path = blob_file_path.clone();
+            full_chunk_store_path.push_str("/");
+            full_chunk_store_path.push_str("store");
+
+            let mut full_index_file_path = blob_file_path.clone();
+            full_index_file_path.push_str("/");
+            full_index_file_path.push_str(&(index_file.to_owned()));
+            
+            DirBuilder::new()
+                .recursive(true)
+                .create(blob_file_path.clone());
+            DirBuilder::new()
+                .recursive(true)
+                .create(full_chunk_store_path.clone());
+            match data.stream_to_file(full_blob_file_path.clone()) {
+                Ok(n) => {
+                    Command::new("binaries/desync")
+                        .args(&["make", &full_index_file_path, "-s", &full_chunk_store_path, &full_blob_file_path])
+                        .output()
+                        .expect("Could not list chunks");
+                    
+                    let out = Command::new("binaries/desync")
+                        .args(&["list-chunks", &full_index_file_path])
+                        .output()
+                        .expect("Could not list chunks");
+ 
+                    if out.status.success() {
+                        let all_chunks = String::from_utf8_lossy(&out.stdout).to_string();
+                        let mut index_chunk_items = Vec::new();
+                        for chunk_name in all_chunks.lines() {
+                            let index_chunk_item = ds::IndexChunkItem {
+                                name: chunk_name.to_owned(),
+                                // TODO: Figure out actual size of chunk
+                                size: 0
+                            };
+                            index_chunk_items.push(index_chunk_item);
+                        }
+                        let index_file = ds::IndexFile {
+                            name: index_file.to_owned(),
+                            //TODO: Check if this is necessary if tag already exists
+                            version: "".to_owned(),
+                            path: full_index_file_path.to_owned(),
+                            chunks: index_chunk_items
+                        };
+                        match db::insert_index(index_file,default_vendor_product_id) {
+                            Some(index_id) => Json(vec![index_id]),
+                            None => Json(vec![])
+                        };
+                    } else {
+                        String::from("Listing chunks not successful");
+                    }
+                },
+                Err(e) => {
+                    println!("Error writing blob to file {}",e);
+                }
+            }
+        },
+        None => {
+            println!("Could not upload blob file");
+        }
+    }
+}
+
 #[post("/stats/download?<stats_index_download..>", rank=2)]
 fn add_index_download_count(stats_index_download: Form<params::StatsIndexDownload>) {
     // TODO: Replace default_vendor_product_id with the one from auth
@@ -403,6 +487,7 @@ fn add_chunk_download_count(stats_chunk_download: Form<params::StatsChunkDownloa
     db::add_chunk_download_count(stats_chunk_download.chunk_id, stats_chunk_download.chunk_name.to_owned(), 
                                 stats_chunk_download.confirmed_count, default_vendor_product_id)
 }
+
 // // Get requests
 // #[get("/indexes")]
 // #[get("/chunk/<id>")]

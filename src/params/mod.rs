@@ -12,6 +12,12 @@ pub struct ChunkUploadParams {
 }
 
 #[derive(FromForm)]
+pub struct BlobUploadParams {
+    pub blob_name: String,
+    pub index_name: String
+}
+
+#[derive(FromForm)]
 pub struct ChunksByIndexQueryParams {
     pub index_id: i32
 }
