@@ -22,20 +22,23 @@ pub fn create_tables() {
         id SERIAL PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
         creation_time timestamp with time zone NOT NULL,
-        accessed_time timestamp with time zone NOT NULL 
+        accessed_time timestamp with time zone NOT NULL,
+        UNIQUE(name)
     )",&[]).expect("Table vendor doesn't exist and could not create it");
         conn.execute("CREATE TABLE IF NOT EXISTS product (
         id SERIAL PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
         creation_time timestamp with time zone NOT NULL,
-        accessed_time timestamp with time zone NOT NULL 
+        accessed_time timestamp with time zone NOT NULL,
+        UNIQUE(name)
     )",&[]).expect("Table product doesn't exist and could not create it");
         conn.execute("CREATE TABLE IF NOT EXISTS vendor_product (
         id SERIAL PRIMARY KEY NOT NULL,
         vendor_id INT NOT NULL,
         product_id INT NOT NULL,
         creation_time timestamp with time zone NOT NULL,
-        accessed_time timestamp with time zone NOT NULL 
+        accessed_time timestamp with time zone NOT NULL,
+        UNIQUE(vendor_id, product_id)
     )",&[]).expect("Table vendor_product doesn't exist and could not create it");
     conn.execute("CREATE TABLE IF NOT EXISTS chunk (
        id SERIAL PRIMARY KEY NOT NULL,
@@ -47,13 +50,17 @@ pub fn create_tables() {
        tags integer ARRAY,
        stats_download_count INT NOT NULL,
        vendor_product_id INT NOT NULL,
-       file_exists boolean default false NOT NULL)", &[]).expect("Table chunk doesn't exist and could not create it");
+       file_exists boolean default false NOT NULL,
+       UNIQUE(index_id, name, vendor_product_id)
+       )", &[]).expect("Table chunk doesn't exist and could not create it");
     conn.execute("CREATE TABLE IF NOT EXISTS tag (
        id SERIAL PRIMARY KEY NOT NULL,
        name TEXT NOT NULL,
        creation_time timestamp with time zone NOT NULL,
        accessed_time timestamp with time zone NOT NULL,
-       vendor_product_id INT NOT NULL)", &[]).expect("Table tag doesn't exist and could not create it");
+       vendor_product_id INT NOT NULL,
+       UNIQUE(name, vendor_product_id)
+       )", &[]).expect("Table tag doesn't exist and could not create it");
     conn.execute("CREATE TABLE IF NOT EXISTS index (
        id SERIAL PRIMARY KEY NOT NULL,
        name TEXT NOT NULL,
@@ -63,7 +70,8 @@ pub fn create_tables() {
        stats_confirmed_download_count INT NOT NULL,
        stats_anonymous_download_count INT NOT NULL,
        vendor_product_id INT NOT NULL,
-       tag_id INT
+       tag_id INT,
+       UNIQUE(name, vendor_product_id)
        )", &[]).expect("Table index doesn't exist and could not create it");
 }
 
@@ -245,7 +253,7 @@ pub fn chunks_all(vendor_product_id: i32) -> Vec<models::Chunk> {
     let mut chunks: Vec<models::Chunk> = Vec::new();
 
     match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,
-                        vendor_product_id FROM chunk where vendor_product_id = $1", &[&vendor_product_id]) {
+                        vendor_product_id FROM chunk where vendor_product_id = $1 ORDER BY ID DESC", &[&vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let chunk = models::Chunk {
@@ -273,7 +281,7 @@ pub fn chunks_for_index_id(index_id: i32, vendor_product_id: i32) -> Vec<models:
     let conn = establish_connection();
     let mut chunks: Vec<models::Chunk> = Vec::new();
 
-    match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,vendor_product_id FROM chunk where index_id = $1 AND vendor_product_id = $2", &[&index_id, &vendor_product_id]) {
+    match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,vendor_product_id FROM chunk where index_id = $1 AND vendor_product_id = $2 ORDER BY ID ASC", &[&index_id, &vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let chunk = models::Chunk {
@@ -301,7 +309,7 @@ pub fn chunks_for_tag_id(tag_id: i32, vendor_product_id: i32) -> Vec<models::Chu
     let conn = establish_connection();
     let mut chunks: Vec<models::Chunk> = Vec::new();
 
-    match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,vendor_product_id FROM chunk where tags @> $1 AND vendor_product_id = $2", &[&vec![tag_id], &vendor_product_id]) {
+    match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,vendor_product_id FROM chunk where tags @> $1 AND vendor_product_id = $2 ORDER BY ID ASC", &[&vec![tag_id], &vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let chunk = models::Chunk {
@@ -329,7 +337,7 @@ pub fn chunks_for_ids(ids: Vec<i32>, vendor_product_id: i32) -> Vec<models::Chun
     let conn = establish_connection();
     let mut chunks: Vec<models::Chunk> = Vec::new();
 
-    match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,vendor_product_id FROM chunk where id = ANY($1) AND vendor_product_id = $2", &[&ids, &vendor_product_id]) {
+    match conn.query("SELECT id,index_id,name,size,creation_time,accessed_time,tags,stats_download_count,vendor_product_id FROM chunk where id = ANY($1) AND vendor_product_id = $2 ORDER BY ID ASC", &[&ids, &vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let chunk = models::Chunk {
@@ -357,7 +365,7 @@ pub fn tags_all(vendor_product_id: i32) -> Vec<models::Tag> {
     let conn = establish_connection();
     let mut tags: Vec<models::Tag> = Vec::new();
 
-    match conn.query("SELECT id, name, creation_time, accessed_time, vendor_product_id FROM tag WHERE vendor_product_id = $1", &[&vendor_product_id]) {
+    match conn.query("SELECT id, name, creation_time, accessed_time, vendor_product_id FROM tag WHERE vendor_product_id = $1 ORDER BY ID DESC", &[&vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let tag = models::Tag {
@@ -381,7 +389,7 @@ pub fn tags_for_ids(ids: Vec<i32>, vendor_product_id: i32) -> Vec<models::Tag> {
     let conn = establish_connection();
     let mut tags: Vec<models::Tag> = Vec::new();
 
-    match conn.query("SELECT id, name, creation_time, accessed_time, vendor_product_id FROM tag WHERE id = ANY($1) AND vendor_product_id = $2", &[&ids, &vendor_product_id]) {
+    match conn.query("SELECT id, name, creation_time, accessed_time, vendor_product_id FROM tag WHERE id = ANY($1) AND vendor_product_id = $2 ORDER BY ID ASC", &[&ids, &vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let tag = models::Tag {
@@ -464,7 +472,7 @@ pub fn indexes_for_ids(ids: Vec<i32>, vendor_product_id: i32) -> Vec<models::Ind
 
     match conn.query("SELECT id, name, chunks, creation_time, accessed_time,
                      stats_confirmed_download_count, stats_anonymous_download_count,vendor_product_id
-                     FROM index WHERE id = ANY($1) AND vendor_product_id = $2", &[&ids, &vendor_product_id]) {
+                     FROM index WHERE id = ANY($1) AND vendor_product_id = $2 ORDER BY ID ASC", &[&ids, &vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let index = models::Index {
@@ -493,7 +501,7 @@ pub fn indexes_all(vendor_product_id: i32) -> Vec<models::Index> {
 
     match conn.query("SELECT id, name, chunks, creation_time, accessed_time,
                      stats_confirmed_download_count, stats_anonymous_download_count,vendor_product_id
-                     FROM index WHERE vendor_product_id = $1", &[&vendor_product_id]) {
+                     FROM index WHERE vendor_product_id = $1 ORDER BY ID DESC", &[&vendor_product_id]) {
         Ok(rows) => {
             for row in rows.iter() {
                 let index = models::Index {
