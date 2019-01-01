@@ -32,7 +32,7 @@ fn main() {
                             indexes_by_id,indexes_all,
                             upload_index, upload_chunks,
                             add_index_download_count, add_chunk_download_count,
-                            upload_blob])
+                            upload_blob, update_from_local_filesystem])
 	      .attach(default) // Disable cors
         .launch();
 }
@@ -488,6 +488,118 @@ fn add_chunk_download_count(stats_chunk_download: Form<params::StatsChunkDownloa
                                 stats_chunk_download.confirmed_count, default_vendor_product_id)
 }
 
+// Local indexes and store 
+use dotenv::dotenv;
+use std::env;
+use std::fs;
+use std::path::Path;
+
+extern crate regex;
+use regex::Regex;
+
+pub struct LocalFile {
+    path: String,
+    file_name: String
+}
+
+#[get("/update/filesystem")]
+fn update_from_local_filesystem() {
+    // TODO: Replace default_vendor_product_id with the one from auth
+    let default_vendor_product_id = 1;
+    
+    dotenv().ok();
+    let local_index_file_path = match env::var("LOCAL_INDEXES_PATH") {
+        Ok(val) => val.clone(),
+        Err(e) => "".to_owned()
+    };
+    let local_chunks_file_path = match env::var("LOCAL_CHUNKS_PATH") {
+        Ok(val) => val.clone(),
+        Err(e) => "".to_owned()
+    };
+    
+    let index_files = get_files(local_index_file_path, vec!["^*.caidx$".to_owned(), "^*.caibx$".to_owned()]);
+    let chunk_files = get_files(local_chunks_file_path, vec!["^*.cacnk$".to_owned()]);
+    for local_index_file in index_files.iter() {
+        let out = Command::new("binaries/desync")
+            .args(&["list-chunks", &local_index_file.path])
+            .output()
+            .expect("Could not list chunks");
+        let index_file_name = local_index_file.file_name.to_owned();
+        if out.status.success() {                
+            let all_chunks = String::from_utf8_lossy(&out.stdout).to_string();
+            let mut index_chunk_items = Vec::new();
+            for chunk_name in all_chunks.lines() {
+                let mut chunk_name_with_ext = chunk_name.to_owned();
+                chunk_name_with_ext.push_str(".cacnk");
+                for local_chunk_file in chunk_files.iter() {
+                    //TODO: If the chunk file doesn't exist on filesystem
+                    if local_chunk_file.file_name == chunk_name_with_ext {
+                        let file_size = fs::metadata(local_chunk_file.path.to_owned()).unwrap().len();
+                        let index_chunk_item = ds::IndexChunkItem {
+                            name: chunk_name.to_owned(),
+                            // TODO: Figure out actual size of chunk
+                            size: file_size as i64
+                        };
+                        index_chunk_items.push(index_chunk_item);
+                        break;
+                    }
+                }
+            }
+            let index_file = ds::IndexFile {
+                name: index_file_name.to_owned(),
+                //TODO: Check if this is necessary if tag already exists
+                version: "".to_owned(),
+                path: local_index_file.path.to_owned(),
+                chunks: index_chunk_items.clone()
+            };
+            match db::insert_index(index_file,default_vendor_product_id) {
+                Some(index_id) => {
+                    for index_chunk_item in index_chunk_items.iter() {
+                        db::update_chunk_file_exists(index_id, 
+                            index_chunk_item.name.to_owned(), default_vendor_product_id);
+                    }
+                },
+                None => ()
+            };
+        } else {
+            panic!("Could not list chunks from the index files");
+        }
+    }
+}
+
+fn get_files(path: String, formats: Vec<String>) -> Vec<LocalFile>{
+    let mut files: Vec<LocalFile> = Vec::new();
+    let mut rexps: Vec<Regex> = Vec::new();
+
+    for format in formats {
+        rexps.push(Regex::new(&format).unwrap());
+    }
+
+    read_dir_recursive(path.to_owned(), &mut files, rexps.clone());
+    // for file in files.iter() {
+    //     println!("File-> {}", file.file_name.to_owned());
+    // }
+    files
+}
+
+fn read_dir_recursive(path: String, files: &mut Vec<LocalFile>, rexps: Vec<Regex>) {
+    if Path::new(&path).is_dir() {
+        for entry in fs::read_dir(&path).unwrap() {
+            let dir = entry.unwrap();
+            read_dir_recursive(dir.path().into_os_string().into_string().unwrap().to_owned(), files, rexps.clone());
+        }
+    } else {
+        for rexp in rexps.iter() {
+            if rexp.is_match(&path) {
+                let localFile = LocalFile {
+                    path: path.to_owned(),
+                    file_name: Path::new(&path).file_name().unwrap().to_str().unwrap().to_owned()
+                };
+                files.push(localFile);
+            }
+        }
+    }
+}
 // // Get requests
 // #[get("/indexes")]
 // #[get("/chunk/<id>")]

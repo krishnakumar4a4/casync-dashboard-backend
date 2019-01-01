@@ -150,6 +150,7 @@ impl IndexItemRow {
     }
 }
 
+#[derive(Clone)]
 pub struct IndexChunkItem {
     pub name: String,
     pub size: i64

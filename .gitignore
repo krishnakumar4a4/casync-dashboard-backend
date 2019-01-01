@@ -6,3 +6,4 @@ default
 *.cacnk
 desync
 casync
+.env
